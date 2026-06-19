@@ -61,93 +61,35 @@ public:
 class Scene
 {
 private:
-    // data to be drawn
-    std::vector<float> points;
-    std::vector<unsigned int> indices;
-    GLuint vbo;
-    GLuint ebo;
-    GLuint vao;
+    
+    std::vector<std::unique_ptr<Object>> objects;
 
 public:
-    Scene (std::string filename) { load (filename); }
-    ~Scene () { clean (); }
-
-    void load (std::string filename)
+    Scene (std::string filename, Shaders& shaders) 
     {
-        Mesh mesh (filename);
-        mesh.pack4gpu (points, indices);
-        send_arrays_2a3f ();
+        add_obj(filename,shaders);
     }
 
-    void clean ()
+    void add_obj(std::string filename, Shaders& shaders)
     {
-        glDeleteVertexArrays (1, &vao);
-        glDeleteBuffers (1, &vbo);
+        objects.push_back(std::make_unique<Mesh>(filename, shaders));
     }
 
-    // // when data will be dynamically loaded, reloading will be useful
-    // void reload ()
-    // {
-    //     clean ();
-    //     load ();
-    // }
+    void draw(){
 
-    void draw ()
-    {
-        // clear the buffers
-        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
 
-        // draw all elements as described by indices
-        glDrawElements(GL_TRIANGLES, indices.size (), GL_UNSIGNED_INT, 0);
+        for (const auto& obj : objects)
+        {
+            obj->draw_obj();
+        }
     }
 
 private:
     // send to the gpu the mesh arrays:
     // - the mesh vertices, 2 attributes, 3 floats each
     // - the mesh indices
-    void send_arrays_2a3f ()
-    {
-        // we want just one buffer, and we retrieve the name OpenGL assigns to it.
-        glGenBuffers (1, &vbo);
-        // bind it as the current VBO
-        glBindBuffer (GL_ARRAY_BUFFER, vbo);
-        // transfer data from CPU RAM to GPU RAM.
-        glBufferData (GL_ARRAY_BUFFER,
-                      points.size () * sizeof (float),
-                      points.data (),
-                      GL_STATIC_DRAW);
 
-        // we want just one buffer container, and we retrieve the name OpenGL assigns to it.
-        glGenVertexArrays (1, &vao);
-        // bind it as the current vao.
-        glBindVertexArray (vao);
-
-        // Attribute 0: position (x, y, z)
-        glVertexAttribPointer (0,
-                               3,
-                               GL_FLOAT,
-                               GL_FALSE,
-                               6 * sizeof(float),
-                               (void*)0);
-        glEnableVertexAttribArray (0);
-
-        // Attribute 1: 3 generic floats (u, v, w)
-        glVertexAttribPointer (1,
-                               3,
-                               GL_FLOAT,
-                               GL_FALSE,
-                               6 * sizeof(float),
-                               (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray (1);
-
-        glGenBuffers(1, &ebo); 
-        // MUST be bound after the VAO's binding!
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                     indices.size () * sizeof (unsigned int),
-                     indices.data (),
-                     GL_STATIC_DRAW);
-    }
 };
 
 
@@ -231,7 +173,9 @@ int main (int argc, char* argv[])
     shaders.use ();
 
     Camera camera (shaders);
-    Scene scene (meshfile);
+    Scene scene (meshfile, shaders);
+
+    scene.add_obj("data/dragon.off",shaders);
 
     glEnable (GL_CULL_FACE);
     glCullFace (GL_BACK);

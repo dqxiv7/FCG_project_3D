@@ -10,6 +10,7 @@
 #include <vector>
 #include <iostream>
 
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/ext/vector_uint3.hpp>
 #include <glm/vec3.hpp> 
 #include <glm/geometric.hpp> 
@@ -19,6 +20,7 @@
 #include <cstdlib>
 
 #include "include/hotshaders.hh"
+#include "include/object.hh"
 #include "include/camera.hh"
 #include "include/mesh.hh"
 

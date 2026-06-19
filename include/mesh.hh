@@ -1,11 +1,14 @@
-class Mesh {
+class Mesh : public Object{
 private:
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<glm::uvec3> triangles;
 
 public:
-    Mesh(const std::string& filename) {
+    Mesh(const std::string& filename, Shaders& shaders) {
+
+        model = glGetUniformLocation(shaders.program, "m");
+
         std::ifstream file (filename);
  
         if (!file.is_open ()) {
@@ -84,36 +87,39 @@ public:
 
         rescale ();
         compute_normals ();
+        compute_mm();
+
+        pack4gpu();
+        send_arrays_2a3f();
     }
-
-    void pack4gpu (std::vector<float>& points, std::vector<unsigned int>& indices)
-    {
-        points = {};
-        // fill up flat points
-        for (size_t i = 0; i < vertices.size(); i++) {
-            const auto& v = vertices[i];
-            const auto& n = normals[i];
-
-            // coords
-            points.push_back (v.x);
-            points.push_back (v.y);
-            points.push_back (v.z);
-            // normals
-            points.push_back (n.x);
-            points.push_back (n.y);
-            points.push_back (n.z);
-        }
-
-        indices = {};
-        // fill up flat triangles
-        for (auto t : triangles)
-            for (unsigned i = 0; i < 3; i++)
-                indices.push_back (t[i]);
-
-    }
-
 
 private:
+
+    void rescale ()
+    {
+        if (vertices.empty ())
+            return;
+
+        // Find bounding box
+        glm::vec3 min_bounds = vertices[0];
+        glm::vec3 max_bounds = vertices[0];
+
+        for (const auto& vertex : vertices) {
+            // glm/glsl min and max work component-wise
+            min_bounds = glm::min (min_bounds, vertex);
+            max_bounds = glm::max (max_bounds, vertex);
+        }
+
+        // Calculate centers and extents along x, y, and z
+        origin = (min_bounds + max_bounds) * 0.5f;
+        // glm::vec3 extents = (max_bounds - min_bounds) * 0.5f;
+
+        // Find the maximum extent to preserve proportions
+        //float max_extent = std::max ({extents.x, extents.y, extents.z});
+        float max_extent = glm::distance (max_bounds, min_bounds) * 0.5;
+
+        scale = glm::vec3(1.f / max_extent);
+    }
 
     void compute_normals ()
     {
@@ -138,32 +144,28 @@ private:
         
     }
 
-    void rescale ()
+    void pack4gpu()
     {
-        if (vertices.empty ())
-            return;
+        points = {};
+        // fill up flat points
+        for (size_t i = 0; i < vertices.size(); i++) {
+            const auto& v = vertices[i];
+            const auto& n = normals[i];
 
-        // Find bounding box
-        glm::vec3 min_bounds = vertices[0];
-        glm::vec3 max_bounds = vertices[0];
-
-        for (const auto& vertex : vertices) {
-            // glm/glsl min and max work component-wise
-            min_bounds = glm::min (min_bounds, vertex);
-            max_bounds = glm::max (max_bounds, vertex);
+            // coords
+            points.push_back (v.x);
+            points.push_back (v.y);
+            points.push_back (v.z);
+            // normals
+            points.push_back (n.x);
+            points.push_back (n.y);
+            points.push_back (n.z);
         }
 
-        // Calculate centers and extents along x, y, and z
-        glm::vec3 centers = (min_bounds + max_bounds) * 0.5f;
-        // glm::vec3 extents = (max_bounds - min_bounds) * 0.5f;
+        indices = {};
 
-        // Find the maximum extent to preserve proportions
-        //float max_extent = std::max ({extents.x, extents.y, extents.z});
-        float max_extent = glm::distance (max_bounds, min_bounds) * 0.5;
-
-        // Normalize vertices: translate to center, then scale uniformly
-        for (auto& vertex : vertices) {
-            vertex = (vertex - centers) / max_extent;
-        }
+        for (auto t : triangles)
+            for (unsigned i = 0; i < 3; i++)
+                indices.push_back (t[i]);
     }
 };
