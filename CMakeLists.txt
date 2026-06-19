@@ -7,35 +7,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 include(FetchContent)
 
-
-#############################
-### Download project data ###
-#############################
-
-set(FETCH_CONTENT_NAME "content")
-set(DOWNLOAD_FILENAME "data.zip")
-FetchContent_Declare(
-    ${FETCH_CONTENT_NAME}
-    URL https://www.dropbox.com/scl/fi/wfb1k6dudfjbfumajoqs4/data.zip?rlkey=wtq3prdzgwaq5x2z34091gmgc&dl=1
-    DOWNLOAD_NAME ${DOWNLOAD_FILENAME}
-    DOWNLOAD_NO_EXTRACT TRUE
-    SOURCE_DIR ${CMAKE_BINARY_DIR}/
-)
-
-FetchContent_MakeAvailable(${FETCH_CONTENT_NAME})
-
-# Manual extraction using the filename variable
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E tar -xzf "${CMAKE_BINARY_DIR}/${DOWNLOAD_FILENAME}"
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-
-# Clean up using variables
-# file(REMOVE "${CMAKE_BINARY_DIR}/${DOWNLOAD_FILENAME}")
-file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/_deps/${FETCH_CONTENT_NAME}-build")
-file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/_deps/${FETCH_CONTENT_NAME}-tmp")
-
-
 ############################
 ### Library dependencies ###
 ############################
@@ -70,17 +41,6 @@ find_package(OpenGL REQUIRED)
 ### Sources and executables ###
 ###############################
 
-SET( fn00 "00_mesh" )
+SET( fn00 "main" )
 add_executable( ${fn00} ${fn00}.cc )
 target_link_libraries( ${fn00} PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
-
-SET( fn01 "01_normals" )
-add_executable( ${fn01} ${fn01}.cc )
-target_link_libraries( ${fn01} PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
-
-SET( fn02 "02_gouraud" )
-add_executable( ${fn02} ${fn02}.cc )
-target_link_libraries( ${fn02} PRIVATE common SFML::Window OpenGL::GL glm::glm-header-only)
-
-
-
