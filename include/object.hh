@@ -10,8 +10,6 @@ class Object{
     std::vector<float> points;
     std::vector<unsigned int> indices;
 
-    GLint model;
-
     GLuint vbo;
     GLuint ebo;
     GLuint vao;
@@ -66,6 +64,8 @@ class Object{
     ~Object(){
       clean();
     }
+
+    GLuint id;
 
     bool moving = false;
 
@@ -127,9 +127,9 @@ class Object{
       M = glm::translate(M, -origin);
     }
 
-    void draw_obj()
+    void draw_obj(GLint model_loc)
       {
-        glUniformMatrix4fv(model, 1, GL_FALSE, &M[0][0]);
+        glUniformMatrix4fv(model_loc, 1, GL_FALSE, &M[0][0]);
 
         glBindVertexArray(vao);
         // draw all elements as described by indices

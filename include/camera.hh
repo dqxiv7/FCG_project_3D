@@ -45,6 +45,8 @@ private:
 public:
 
     glm::mat4 inv_v;
+    glm::mat4 pr;
+    glm::mat4 vp;
 
     Camera (Shaders& shaders)
     {
@@ -127,6 +129,12 @@ public:
         update ();
     }
 
+    void apply_vp (Shaders& shader)
+    {
+        GLint loc = glGetUniformLocation (shader.program, "vp");
+        glUniformMatrix4fv (loc, 1, GL_FALSE, &vp[0][0]);
+    }
+
 private:
 
     void update ()
@@ -175,16 +183,15 @@ private:
          **  width 2r and height 2t in view space, the coefficients    **
          **  containing fd must be scaled accordingly.                 **
          ****************************************************************/
-        glm::mat4 pr = glm::mat4(
-                                 fd,  0.0, 0.0,  0.0,    // 1st column
-                                 0.0,  fd, 0.0,  0.0,    // 2nd column
-                                 0.0, 0.0,   a, -1.0,    // 3rd column
-                                 0.0, 0.0,   b,  0.0     // 4th column
-                                 );
+        pr = glm::mat4(
+                        fd,  0.0, 0.0,  0.0,    // 1st column
+                        0.0,  fd, 0.0,  0.0,    // 2nd column
+                        0.0, 0.0,   a, -1.0,    // 3rd column
+                        0.0, 0.0,   b,  0.0     // 4th column
+                        );
 
         // Compute VP matrix and update it
         glm::mat4 v = t * rx * ry; 
-        glm::mat4 vp; 
         vp = pr * v;
         glUniformMatrix4fv (vp_loc, 1, GL_FALSE, &vp[0][0]);
 

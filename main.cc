@@ -63,37 +63,94 @@ class Scene
 private:
     
     std::vector<std::unique_ptr<Object>> objects;
+    GLuint FBO;
+    GLuint pickingTexture;
+    GLuint RBO;
+    GLuint obj_id = 1;
 
 public:
+
+    Object* active = nullptr;
+
     Scene (std::string filename, Shaders& shaders) 
     {
+        initPickingBuffer();
         add_obj(filename,shaders);
+        active = objects.at(0).get();
     }
 
     void add_obj(std::string filename, Shaders& shaders)
     {
-        objects.push_back(std::make_unique<Mesh>(filename, shaders));
+        objects.push_back(std::make_unique<Mesh>(filename, shaders, obj_id++));
     }
 
-    Object& get_obj()
+    const std::vector<std::unique_ptr<Object>>& get_objects() const {
+        return objects;
+    }
+
+    GLuint pick(glm::vec2 pos, sf::Window& window, Shaders& shader, Camera&camera)
     {
-        return *objects.at(0);
+        sf::Vector2u size = window.getSize();
+
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f); 
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        shader.use();
+
+        camera.apply_vp(shader);
+
+        GLint id_loc = glGetUniformLocation(shader.program, "object_id");
+        GLint model_loc = glGetUniformLocation(shader.program, "m");
+
+        for (const auto& obj : objects) {
+            // Inviamo l'ID univoco di questa specifica mesh allo shader
+            glUniform1ui(id_loc, obj->id);
+            obj->draw_obj(model_loc);
+        }
+
+        unsigned int pickedID = 0;
+        glReadPixels(pos.x, size.y - pos.y, 1, 1, GL_RED_INTEGER, GL_UNSIGNED_INT, &pickedID);
+
+        std::cout << "DEBUG: pixel_id letto dal buffer è: " << pickedID << std::endl;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        return pickedID;
     }
 
-    void draw(){
+    void draw(Shaders& shader){
 
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
 
+        GLint model_loc = glGetUniformLocation(shader.program, "m");
+
         for (const auto& obj : objects)
         {
-            obj->draw_obj();
+            obj->draw_obj(model_loc);
         }
     }
 
 private:
-    // send to the gpu the mesh arrays:
-    // - the mesh vertices, 2 attributes, 3 floats each
-    // - the mesh indices
+        
+    void initPickingBuffer()
+    {
+        glGenFramebuffers(1, &FBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+
+        glGenTextures(1, &pickingTexture);
+        glBindTexture(GL_TEXTURE_2D, pickingTexture);
+
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, 800, 800, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, NULL);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pickingTexture, 0);
+
+        glGenRenderbuffers(1, &RBO);
+        glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 800, 800);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, RBO);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
 };
 
@@ -185,8 +242,30 @@ void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object& object)
         camera.dolly(dy);
 }
 
-void handle (const sf::Event::MouseWheelScrolled* wheel, Camera& camera){
+void handle (const sf::Event::MouseWheelScrolled* wheel, Camera& camera)
+{
     camera.zoom(wheel->delta);
+}
+
+void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& picking, Shaders& shaders, sf::Window& window, Camera& camera)
+{
+    if (mouse->button == sf::Mouse::Button::Left){
+        sf::Vector2i pixel_tmp = sf::Mouse::getPosition(window);
+        glm::vec2 pixel_pos = glm::vec2(pixel_tmp.x, pixel_tmp.y);
+
+        GLuint id = scene.pick(pixel_pos, window, picking, camera);
+        std::cout << "ID cliccato: " << id << std::endl;
+        shaders.use();
+
+        if (id > 0)
+        {
+            const auto& objs = scene.get_objects();
+            for (const auto& obj : objs){
+                if (obj->id == id)
+                    scene.active = obj.get();
+            }
+        }
+    }
 }
 
 //////////
@@ -208,8 +287,10 @@ int main (int argc, char* argv[])
     Setup setup;
     sf::Window& window = *setup.window;
 
-    Shaders shaders ("00_vertex.vert", "00_fragment.frag");
+    Shaders shaders ("vertex.vert", "fragment.frag");
     shaders.use ();
+
+    Shaders picking ("vertex.vert", "picking.frag");
 
     Camera camera (shaders);
     Scene scene (meshfile, shaders);
@@ -234,14 +315,16 @@ int main (int argc, char* argv[])
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
                 glViewport (0, 0, resized->size.x, resized->size.y);
             else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
-                handle (*key_pressed, shaders, camera, scene.get_obj());
+                handle (*key_pressed, shaders, camera, *scene.active);
             else if (const auto* mouse = event->getIf<sf::Event::MouseMoved> ())
-                handle (mouse, camera, scene.get_obj());
+                handle (mouse, camera, *scene.active);
             else if (const auto* wheel = event->getIf<sf::Event::MouseWheelScrolled> ())
                 handle (wheel, camera);
+            else if (const auto* mouse = event->getIf<sf::Event::MouseButtonPressed>())
+                handle(mouse, scene, picking, shaders, window, camera);
         }
 
-        scene.draw ();
+        scene.draw (shaders);
         window.display ();
     }
 

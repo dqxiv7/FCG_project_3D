@@ -5,10 +5,10 @@ private:
     std::vector<glm::uvec3> triangles;
 
 public:
-    Mesh(const std::string& filename, Shaders& shaders) {
+    Mesh(const std::string& filename, Shaders& shaders, GLuint pick_id) {
 
-        model = glGetUniformLocation(shaders.program, "m");
-
+        id = pick_id;
+        
         std::ifstream file (filename);
  
         if (!file.is_open ()) {
