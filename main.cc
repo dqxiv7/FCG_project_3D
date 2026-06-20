@@ -75,6 +75,11 @@ public:
         objects.push_back(std::make_unique<Mesh>(filename, shaders));
     }
 
+    Object& get_obj()
+    {
+        return *objects.at(0);
+    }
+
     void draw(){
 
         glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
@@ -98,7 +103,7 @@ private:
 // SFML Callbacks //
 ////////////////////
 
-void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera)
+void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera, Object& object)
 {
 
     switch (key.scancode) {
@@ -115,12 +120,41 @@ void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera)
     case sf::Keyboard::Scancode::W:
         camera.view_wide ();
         return;
+    case sf::Keyboard::Scancode::G:
+        if (!object.moving){
+            object.moving = true;
+            object.mode = Object::TransformMode::Translate;
+        }
+        else{ 
+            object.moving = false;
+            object.mode = Object::TransformMode::None;            
+        }
+        return;
+    case sf::Keyboard::Scancode::R:
+        if (!object.moving){
+            object.moving = true;
+            object.mode = Object::TransformMode::Rotate;
+        }
+        else{ 
+            object.moving = false;
+            object.mode = Object::TransformMode::None;            
+        }
+        return;
+    case sf::Keyboard::Scancode::S:
+        if (!object.moving){
+            object.moving = true;
+            object.mode = Object::TransformMode::Scale;
+        }
+        else{ 
+            object.moving = false;
+            object.mode = Object::TransformMode::None;            
+        }
     default:
         return;
     }
 }
 
-void handle (const sf::Event::MouseMoved* mouse, Camera& camera)
+void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object& object)
 {
     float x = mouse->position.x;
     float y = mouse->position.y;
@@ -133,7 +167,15 @@ void handle (const sf::Event::MouseMoved* mouse, Camera& camera)
     prev_x = x;
     prev_y = y;
 
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)){
+    if (object.moving){
+        if (object.mode == Object::TransformMode::Translate)
+            object.translation(dx,-dy,camera.inv_v);
+        else if (object.mode == Object::TransformMode::Rotate)
+            object.rotation(dx, dy, camera.inv_v);
+        else if (object.mode == Object::TransformMode::Scale)
+            object.scale(dx,dy);
+    }
+    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)){
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
             camera.pan(dx,dy);
     }
@@ -146,8 +188,6 @@ void handle (const sf::Event::MouseMoved* mouse, Camera& camera)
 void handle (const sf::Event::MouseWheelScrolled* wheel, Camera& camera){
     camera.zoom(wheel->delta);
 }
-
-
 
 //////////
 // Main //
@@ -162,7 +202,6 @@ int main (int argc, char* argv[])
     else {
         meshfile = "data/cube.off";
     }
-
 
     //// Startup ////
 
@@ -195,9 +234,9 @@ int main (int argc, char* argv[])
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
                 glViewport (0, 0, resized->size.x, resized->size.y);
             else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
-                handle (*key_pressed, shaders, camera);
+                handle (*key_pressed, shaders, camera, scene.get_obj());
             else if (const auto* mouse = event->getIf<sf::Event::MouseMoved> ())
-                handle (mouse, camera);
+                handle (mouse, camera, scene.get_obj());
             else if (const auto* wheel = event->getIf<sf::Event::MouseWheelScrolled> ())
                 handle (wheel, camera);
         }

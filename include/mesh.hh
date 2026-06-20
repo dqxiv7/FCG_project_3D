@@ -118,7 +118,7 @@ private:
         //float max_extent = std::max ({extents.x, extents.y, extents.z});
         float max_extent = glm::distance (max_bounds, min_bounds) * 0.5;
 
-        scale = glm::vec3(1.f / max_extent);
+        scale_factor = glm::vec3(1.f / max_extent);
     }
 
     void compute_normals ()

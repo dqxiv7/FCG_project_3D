@@ -1,9 +1,11 @@
 class Object{
   protected:
     glm::vec3 position = {0,0,0};
-    glm::vec3 rotation = {0,0,0};
-    glm::vec3 scale = {1,1,1};
+    glm::vec3 scale_factor = {1,1,1};
     glm::vec3 origin = {0,0,0};
+
+    glm::mat4 R_m = glm::mat4(1.f);
+    glm::mat4 M = glm::mat4(1.f);
 
     std::vector<float> points;
     std::vector<unsigned int> indices;
@@ -65,30 +67,76 @@ class Object{
       clean();
     }
 
-  void compute_mm(){
-    glm::mat4 I = glm::mat4(1.f);
+    bool moving = false;
 
-    glm::mat4 M = glm::translate(I, position);
-    
-    M = glm::rotate(M, glm::radians(rotation.x), glm::vec3(1.f,0.f,0.f));
-    M = glm::rotate(M, glm::radians(rotation.y), glm::vec3(0.f,1.f,0.f));
-    M = glm::rotate(M, glm::radians(rotation.z), glm::vec3(0.f,0.f,1.f));
-  
-    M = glm::scale(M,scale);
+    enum class TransformMode {None, Translate, Rotate, Scale};
+    TransformMode mode = TransformMode::None;
 
-    M = glm::translate(M, -origin);
-
-    glUniformMatrix4fv(model, 1, GL_FALSE, &M[0][0]);
-  }
-
-  void draw_obj()
+    void translation(float dx, float dy, glm::mat4 inv)
     {
-      glBindVertexArray(vao);
-      // draw all elements as described by indices
-      glDrawElements(GL_TRIANGLES, indices.size (), GL_UNSIGNED_INT, 0);
+      glm::vec3 cam_right = glm::normalize(glm::vec3(inv[0]));
+      glm::vec3 cam_up = glm::normalize(glm::vec3(inv[1]));
 
-      glBindVertexArray(0);
+      float sensitivity = 0.005f;
+
+      glm::vec3 displacement = (cam_right * dx + cam_up * dy) * sensitivity;
+
+      position += displacement;
+
+      compute_mm();
     }
+
+    void rotation(float dx, float dy, glm::mat4 inv)
+    {
+
+      glm::vec3 cam_right = glm::normalize(glm::vec3(inv[0]));
+      glm::vec3 cam_up = glm::normalize(glm::vec3(inv[1]));
+
+      float sensitivity = 0.005f;
+
+      glm::mat4 r_x = glm::rotate(glm::mat4(1.f), dx * sensitivity, cam_up);
+      glm::mat4 r_y = glm::rotate(glm::mat4(1.f), dy * sensitivity, cam_right);
+
+      R_m = r_x * r_y * R_m;
+      
+      compute_mm();
+    }
+
+    void scale (float dx, float dy){
+      
+      float sensitivity = 0.005f;
+
+      float norma = glm::length(glm::vec2(dx,dy));
+
+      float dir = (dx + dy) > 0 ? 1.f : -1.f;
+
+      scale_factor += glm::vec3(norma * dir * sensitivity);
+
+      compute_mm();
+    }
+
+    void compute_mm(){
+      glm::mat4 I = glm::mat4(1.f);
+
+      M = glm::translate(I, position);
+      
+      M = M * R_m;
+    
+      M = glm::scale(M,scale_factor);
+
+      M = glm::translate(M, -origin);
+    }
+
+    void draw_obj()
+      {
+        glUniformMatrix4fv(model, 1, GL_FALSE, &M[0][0]);
+
+        glBindVertexArray(vao);
+        // draw all elements as described by indices
+        glDrawElements(GL_TRIANGLES, indices.size (), GL_UNSIGNED_INT, 0);
+
+        glBindVertexArray(0);
+      }
 
   private:
     void clean ()

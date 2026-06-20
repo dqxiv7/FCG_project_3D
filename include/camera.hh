@@ -43,6 +43,9 @@ private:
 
     
 public:
+
+    glm::mat4 inv_v;
+
     Camera (Shaders& shaders)
     {
         vp_loc = glGetUniformLocation (shaders.program, "vp");
@@ -185,7 +188,7 @@ private:
         vp = pr * v;
         glUniformMatrix4fv (vp_loc, 1, GL_FALSE, &vp[0][0]);
 
-        glm::mat4 inv_v = glm::inverse (v);
+        inv_v = glm::inverse (v);
 
         glm::vec4 cp4 = {0.0, 0.0, 0.0, 1.0};
         cp4 = inv_v * cp4;
