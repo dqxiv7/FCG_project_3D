@@ -1,6 +1,7 @@
 #version 410 core
 
 in vec3 interpolated_pos;
+in vec3 interpolated_normal;
 
 uniform vec3 camera_pos;
 
@@ -19,14 +20,17 @@ struct Material {
 };
 uniform Material material;
 
+uniform bool unlit;
 
 out vec4 fragment_color;
 void main()
 {
-    vec3 dx = dFdx(interpolated_pos);
-    vec3 dy = dFdy(interpolated_pos);
+    if (unlit) {
+        fragment_color = vec4(1.0, 0.65, 0.2, 1.0);
+        return;
+    }
 
-    vec3 normal = normalize (cross (dx, dy));
+    vec3 normal = normalize (interpolated_normal);
 
     // Ambient
     vec3 ambient = material.ambient * light.ambient_val;

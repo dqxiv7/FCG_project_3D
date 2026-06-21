@@ -19,7 +19,7 @@ public:
         sf::ContextSettings settings;
         settings.depthBits = 32;
         settings.stencilBits = 8;
-        settings.antiAliasingLevel = 4;
+        settings.antiAliasingLevel = 0;
         settings.attributeFlags = sf::ContextSettings::Attribute::Core;
         settings.majorVersion = 4;
         settings.minorVersion = 1;
@@ -72,16 +72,22 @@ public:
 
     Object* active = nullptr;
 
-    Scene (std::string filename, Shaders& shaders) 
+    Scene (std::string filename, Shaders& shaders)
     {
         initPickingBuffer();
         add_obj(filename,shaders);
+        add_light(shaders);
         active = objects.at(0).get();
     }
 
     void add_obj(std::string filename, Shaders& shaders)
     {
         objects.push_back(std::make_unique<Mesh>(filename, shaders, obj_id++));
+    }
+
+    void add_light(Shaders& shaders)
+    {
+        objects.push_back(std::make_unique<Light>(shaders, obj_id++));
     }
 
     const std::vector<std::unique_ptr<Object>>& get_objects() const {
@@ -160,7 +166,7 @@ private:
 // SFML Callbacks //
 ////////////////////
 
-void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera, Object& object)
+void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera, Object& object, Scene& scene)
 {
 
     switch (key.scancode) {
@@ -274,13 +280,10 @@ void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& 
 
 int main (int argc, char* argv[])
 {
-    // mandatory command line argument: mesh file to open
-    std::string meshfile = "";
-    if (argc > 1)
-        meshfile = argv[1];
-    else {
-        meshfile = "data/cube.off";
-    }
+    // optional command line arguments: extra mesh files to open
+    std::vector<std::string> meshfiles;
+    for (int i = 1; i < argc; ++i)
+        meshfiles.push_back (argv[i]);
 
     //// Startup ////
 
@@ -288,14 +291,20 @@ int main (int argc, char* argv[])
     sf::Window& window = *setup.window;
 
     Shaders shaders ("vertex.vert", "fragment.frag");
+
     shaders.use ();
+
 
     Shaders picking ("vertex.vert", "picking.frag");
 
-    Camera camera (shaders);
-    Scene scene (meshfile, shaders);
 
-    scene.add_obj("data/dragon.off",shaders);
+    Camera camera (shaders);
+
+    // the cube is always the first object loaded into the scene
+    Scene scene ("data/cube.off", shaders);
+
+    for (const auto& meshfile : meshfiles)
+        scene.add_obj (meshfile, shaders);
 
     glEnable (GL_CULL_FACE);
     glCullFace (GL_BACK);
@@ -315,7 +324,7 @@ int main (int argc, char* argv[])
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
                 glViewport (0, 0, resized->size.x, resized->size.y);
             else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
-                handle (*key_pressed, shaders, camera, *scene.active);
+                handle (*key_pressed, shaders, camera, *scene.active, scene);
             else if (const auto* mouse = event->getIf<sf::Event::MouseMoved> ())
                 handle (mouse, camera, *scene.active);
             else if (const auto* wheel = event->getIf<sf::Event::MouseWheelScrolled> ())

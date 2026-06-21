@@ -10,9 +10,9 @@ class Object{
     std::vector<float> points;
     std::vector<unsigned int> indices;
 
-    GLuint vbo;
-    GLuint ebo;
-    GLuint vao;
+    GLuint vbo = 0;
+    GLuint ebo = 0;
+    GLuint vao = 0;
 
     void send_arrays_2a3f ()
     {
@@ -61,7 +61,7 @@ class Object{
   public:
     Object(){};
 
-    ~Object(){
+    virtual ~Object(){
       clean();
     }
 
@@ -115,7 +115,7 @@ class Object{
       compute_mm();
     }
 
-    void compute_mm(){
+    virtual void compute_mm(){
       glm::mat4 I = glm::mat4(1.f);
 
       M = glm::translate(I, position);
@@ -127,7 +127,7 @@ class Object{
       M = glm::translate(M, -origin);
     }
 
-    void draw_obj(GLint model_loc)
+    virtual void draw_obj(GLint model_loc)
       {
         glUniformMatrix4fv(model_loc, 1, GL_FALSE, &M[0][0]);
 
@@ -143,5 +143,6 @@ class Object{
     {
         glDeleteVertexArrays (1, &vao);
         glDeleteBuffers (1, &vbo);
+        glDeleteBuffers (1, &ebo);
     }
 };

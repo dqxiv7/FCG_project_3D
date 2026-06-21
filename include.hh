@@ -4,8 +4,8 @@
 #include <string>
 #include <fstream>
 #include <filesystem>
-#include<stdio.h>
-#include<stdlib.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sstream>
 #include <vector>
 #include <iostream>
@@ -23,5 +23,6 @@
 #include "include/object.hh"
 #include "include/camera.hh"
 #include "include/mesh.hh"
+#include "include/light.hh"
 
 #endif

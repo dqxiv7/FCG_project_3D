@@ -7,6 +7,7 @@ uniform mat4 vp;
 uniform mat4 m;
 
 out vec3 interpolated_pos;
+out vec3 interpolated_normal;
 
 void main()
 {
@@ -15,4 +16,6 @@ void main()
     gl_Position = vp * world_pos;
 
     interpolated_pos = vec3(world_pos);
+
+    interpolated_normal = normal;
 }
