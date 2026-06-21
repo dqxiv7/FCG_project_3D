@@ -7,16 +7,22 @@
 class Camera
 {
 private:
+    struct aspect{
+        float width;
+        float height;
+    };
+
     GLint vp_loc;
     float phi_deg = 210.0;
     float theta_deg = 2.0;
 
-    const float normal_fd = 4.0;
+    const float normal_fd = 6.0;
     const float tele_fd = 100.0;
     const float wide_fd = 1.5;
 
-    float fd; // focal distance
-    float od; // object distance
+    // how far from the origin the scene is allowed to extend
+    // (near/far clip and lateral FOV are sized around this, independently of zoom)
+    const float world_radius = 5.0;
 
     float pan_x = 0.f;
     float pan_y = 0.f;
@@ -41,6 +47,10 @@ public:
     glm::mat4 inv_v;
     glm::mat4 pr;
     glm::mat4 vp;
+    aspect aspect = {800,800};
+
+    float fd; // focal distance
+    float od; // object distance
 
     Camera (Shaders& shaders)
     {
@@ -58,13 +68,12 @@ public:
         glUniform1fv (material_shininess_loc, 1, &material_shininess);
 
         view_normal ();
-        update ();
     }
 
     void drag (float dx, float dy)
     {
-        phi_deg += dx * 0.2;
-        theta_deg += dy * 0.2;
+        phi_deg += dx * 0.2 *(od/fd);
+        theta_deg += dy * 0.2 * (od/fd);
         theta_deg = theta_deg > 90.0? 90.0 : theta_deg;
         theta_deg = theta_deg < -90.0? -90.0 : theta_deg;
         update ();
@@ -72,7 +81,7 @@ public:
 
     void zoom (float dy)
     {
-        float ratio = fd / 10.0;
+        float ratio = fd / 100.0;
         fd += dy * ratio;
         if (fd < 0.1)
             fd = 0.1;
@@ -82,14 +91,14 @@ public:
 
     void pan (float dx, float dy)
     {
-        pan_x += dx * 0.005;
-        pan_y -= dy * 0.005;
+        pan_x += dx * 0.005 * (od/fd);
+        pan_y -= dy * 0.005 * (od/fd);
         update();
     }
 
     void dolly (float dy)
     {
-        float ratio = od / 100.0;
+        float ratio = od / 10.0;
         od -= dy * ratio; // note: we go in the opposite direction of zoooming
         if (od < 0.5)
             od = 0.5;
@@ -124,14 +133,23 @@ public:
         glUniformMatrix4fv (loc, 1, GL_FALSE, &vp[0][0]);
     }
 
+    void resize (float x, float y)
+    {
+        aspect.width = x;
+        aspect.height = y;
+        update();
+    }
+
 private:
 
     void update ()
     {    
-        float ncp = od - 1.0; // distance near clip plane
+        float ratio = aspect.height / aspect.width;
+
+        float ncp = od - world_radius; // distance near clip plane
         if (ncp < 0.1)
             ncp = 0.1;
-        float fcp = od + 1.0; // distance far clip plane
+        float fcp = od + world_radius; // distance far clip plane
 
         // prepare rotation matrices
         //// Convert degrees to radians, compute sin and cos
@@ -165,16 +183,13 @@ private:
         float a = (fcp + ncp) / (ncp - fcp);       // coefficient 3rd col
         float b = 2.0 * fcp * ncp / (ncp - fcp);   // coefficient 4th col
 
-        /*** NOTE *******************************************************
-         **  We use fd directly as coefficient in the first two lines. **
-         **  It works because our scene is in a unitary cube.          **
-         **  If the image plane is centered about the view axis, with  **
-         **  width 2r and height 2t in view space, the coefficients    **
-         **  containing fd must be scaled accordingly.                 **
-         ****************************************************************/
+        // fd controls zoom (lens), world_radius controls how much of the
+        // world is framed at a given zoom level — the two are independent.
+        float lens = fd / world_radius;
+
         pr = glm::mat4(
-                        fd,  0.0, 0.0,  0.0,    // 1st column
-                        0.0,  fd, 0.0,  0.0,    // 2nd column
+                        lens * ratio,  0.0, 0.0,  0.0,    // 1st column
+                        0.0,  lens, 0.0,  0.0,    // 2nd column
                         0.0, 0.0,   a, -1.0,    // 3rd column
                         0.0, 0.0,   b,  0.0     // 4th column
                         );

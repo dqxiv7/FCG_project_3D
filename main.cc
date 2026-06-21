@@ -74,7 +74,7 @@ public:
 
     Scene (std::string filename, Shaders& shaders)
     {
-        initPickingBuffer();
+        initPickingBuffer(800, 800);
         add_obj(filename,shaders);
         add_light(shaders);
         active = objects.at(0).get();
@@ -137,23 +137,30 @@ public:
         }
     }
 
+    void resize_picking_buffer(int width, int height)
+    {
+        glBindTexture(GL_TEXTURE_2D, pickingTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, width, height, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, NULL);
+
+        glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    }
+
 private:
-        
-    void initPickingBuffer()
+    void initPickingBuffer(int width, int height)
     {
         glGenFramebuffers(1, &FBO);
         glBindFramebuffer(GL_FRAMEBUFFER, FBO);
 
         glGenTextures(1, &pickingTexture);
         glBindTexture(GL_TEXTURE_2D, pickingTexture);
-
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, 800, 800, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, NULL);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pickingTexture, 0);
 
         glGenRenderbuffers(1, &RBO);
         glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 800, 800);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, RBO);
+
+        resize_picking_buffer(width, height);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
@@ -232,11 +239,11 @@ void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object& object)
 
     if (object.moving){
         if (object.mode == Object::TransformMode::Translate)
-            object.translation(dx,-dy,camera.inv_v);
+            object.translation(dx,-dy,camera.inv_v, camera.od, camera.fd);
         else if (object.mode == Object::TransformMode::Rotate)
-            object.rotation(dx, dy, camera.inv_v);
+            object.rotation(dx, dy, camera.inv_v, camera.od, camera.fd);
         else if (object.mode == Object::TransformMode::Scale)
-            object.scale(dx,dy);
+            object.scale(dx,dy, camera.od, camera.fd);
     }
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)){
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
@@ -245,12 +252,12 @@ void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object& object)
     else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
         camera.drag (dx, dy);
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LAlt))
-        camera.dolly(dy);
+        camera.zoom(dy);
 }
 
 void handle (const sf::Event::MouseWheelScrolled* wheel, Camera& camera)
 {
-    camera.zoom(wheel->delta);
+    camera.dolly(wheel->delta);
 }
 
 void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& picking, Shaders& shaders, sf::Window& window, Camera& camera)
@@ -272,6 +279,13 @@ void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& 
             }
         }
     }
+}
+
+void handle (const sf::Event::Resized* resized, Camera& camera, Scene& scene)
+{
+    glViewport (0, 0, resized->size.x, resized->size.y);
+    camera.resize(resized->size.x, resized->size.y);
+    scene.resize_picking_buffer(resized->size.x, resized->size.y);
 }
 
 //////////
@@ -322,7 +336,7 @@ int main (int argc, char* argv[])
             if (event->is<sf::Event::Closed> ())
                 running = false;
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
-                glViewport (0, 0, resized->size.x, resized->size.y);
+                handle (resized, camera, scene);
             else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
                 handle (*key_pressed, shaders, camera, *scene.active, scene);
             else if (const auto* mouse = event->getIf<sf::Event::MouseMoved> ())

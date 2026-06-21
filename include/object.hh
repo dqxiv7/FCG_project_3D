@@ -72,12 +72,12 @@ class Object{
     enum class TransformMode {None, Translate, Rotate, Scale};
     TransformMode mode = TransformMode::None;
 
-    void translation(float dx, float dy, glm::mat4 inv)
+    void translation(float dx, float dy, glm::mat4 inv, float od, float fd)
     {
       glm::vec3 cam_right = glm::normalize(glm::vec3(inv[0]));
       glm::vec3 cam_up = glm::normalize(glm::vec3(inv[1]));
 
-      float sensitivity = 0.005f;
+      float sensitivity = 0.005f * (od / fd);
 
       glm::vec3 displacement = (cam_right * dx + cam_up * dy) * sensitivity;
 
@@ -86,13 +86,13 @@ class Object{
       compute_mm();
     }
 
-    void rotation(float dx, float dy, glm::mat4 inv)
+    void rotation(float dx, float dy, glm::mat4 inv, float od, float fd)
     {
 
       glm::vec3 cam_right = glm::normalize(glm::vec3(inv[0]));
       glm::vec3 cam_up = glm::normalize(glm::vec3(inv[1]));
 
-      float sensitivity = 0.005f;
+      float sensitivity = 0.005f * (od / fd);
 
       glm::mat4 r_x = glm::rotate(glm::mat4(1.f), dx * sensitivity, cam_up);
       glm::mat4 r_y = glm::rotate(glm::mat4(1.f), dy * sensitivity, cam_right);
@@ -102,9 +102,9 @@ class Object{
       compute_mm();
     }
 
-    void scale (float dx, float dy){
+    void scale (float dx, float dy, float od, float fd){
       
-      float sensitivity = 0.005f;
+      float sensitivity = 0.005f * (od / fd);
 
       float norma = glm::length(glm::vec2(dx,dy));
 
