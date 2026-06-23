@@ -72,6 +72,9 @@ class Object{
     enum class TransformMode {None, Translate, Rotate, Scale};
     TransformMode mode = TransformMode::None;
 
+    fcg::Trackball trackball;
+    bool trackball_active = false;
+
     void translation(float dx, float dy, glm::mat4 inv, float od, float fd)
     {
       glm::vec3 cam_right = glm::normalize(glm::vec3(inv[0]));
@@ -86,19 +89,28 @@ class Object{
       compute_mm();
     }
 
-    void rotation(float dx, float dy, glm::mat4 inv, float od, float fd)
+    void rotation(float mouse_x, float mouse_y, glm::mat4 inv, float win_width, float win_height)
     {
+      trackball.set_window_size ((int)win_width, (int)win_height);
 
-      glm::vec3 cam_right = glm::normalize(glm::vec3(inv[0]));
-      glm::vec3 cam_up = glm::normalize(glm::vec3(inv[1]));
+      if (!trackball_active) {
+          trackball.start (mouse_x, mouse_y);
+          trackball_active = true;
+      } else {
+          trackball.move (mouse_x, mouse_y);
+      }
 
-      float sensitivity = 0.005f * (od / fd);
+      // La rotazione del trackball è calcolata in uno spazio locale fisso
+      // (x schermo, y schermo, profondità virtuale). Per applicarla come
+      // rotazione mondo coerente con la vista attuale della camera, la
+      // portiamo nella base della camera (cam_right/up/forward, le colonne
+      // di inv) e poi torniamo indietro: R_world = base * R_local * base^-1.
+      glm::mat3 cam_basis = glm::mat3 (inv);
+      glm::mat3 local_rotation = glm::mat3 (trackball.rotation_matrix ());
+      glm::mat3 world_rotation = cam_basis * local_rotation * glm::transpose (cam_basis);
 
-      glm::mat4 r_x = glm::rotate(glm::mat4(1.f), dx * sensitivity, cam_up);
-      glm::mat4 r_y = glm::rotate(glm::mat4(1.f), dy * sensitivity, cam_right);
+      R_m = glm::mat4 (world_rotation);
 
-      R_m = r_x * r_y * R_m;
-      
       compute_mm();
     }
 
@@ -127,9 +139,12 @@ class Object{
       M = glm::translate(M, -origin);
     }
 
-    virtual void draw_obj(GLint model_loc)
+    virtual void draw_obj(GLint model_loc, GLint normal_matrix_loc)
       {
         glUniformMatrix4fv(model_loc, 1, GL_FALSE, &M[0][0]);
+
+        glm::mat3 normal_matrix = glm::transpose (glm::inverse (glm::mat3 (M)));
+        glUniformMatrix3fv(normal_matrix_loc, 1, GL_FALSE, &normal_matrix[0][0]);
 
         glBindVertexArray(vao);
         // draw all elements as described by indices

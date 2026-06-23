@@ -13,8 +13,9 @@ private:
     };
 
     GLint vp_loc;
-    float phi_deg = 210.0;
-    float theta_deg = 2.0;
+
+    fcg::Trackball trackball;
+    bool dragging = false;
 
     const float normal_fd = 6.0;
     const float tele_fd = 100.0;
@@ -36,9 +37,9 @@ private:
     GLint material_specular_loc;  // rgb
     GLint material_shininess_loc; // scalar
 
-    glm::vec3 material_diffuse = {0.7, 0.7, 0.7};   // rgb
-    glm::vec3 material_ambient = {0.1, 0.1, 0.1};   // rgb
-    glm::vec3 material_specular = {0.7, 0.7, 0.7};  // rgb
+    glm::vec3 material_diffuse = {0.8, 0.7, 0.6};   // rgb
+    glm::vec3 material_ambient = {0.5, 0.5, 0.8};   // rgb
+    glm::vec3 material_specular = {1.0, 1.0, 1.0};  // rgb
     float material_shininess = 3.0; // scalar
 
     
@@ -70,13 +71,21 @@ public:
         view_normal ();
     }
 
-    void drag (float dx, float dy)
+    void drag (float x, float y)
     {
-        phi_deg += dx * 0.2 *(od/fd);
-        theta_deg += dy * 0.2 * (od/fd);
-        theta_deg = theta_deg > 90.0? 90.0 : theta_deg;
-        theta_deg = theta_deg < -90.0? -90.0 : theta_deg;
+        if (!dragging) {
+            trackball.start (x, y);
+            dragging = true;
+        } else {
+            trackball.move (x, y);
+        }
         update ();
+    }
+
+    void drag_stop ()
+    {
+        dragging = false;
+        trackball.stop ();
     }
 
     void zoom (float dy)
@@ -143,7 +152,7 @@ public:
 private:
 
     void update ()
-    {    
+    {
         float ratio = aspect.height / aspect.width;
 
         float ncp = od - world_radius; // distance near clip plane
@@ -151,25 +160,16 @@ private:
             ncp = 0.1;
         float fcp = od + world_radius; // distance far clip plane
 
-        // prepare rotation matrices
-        //// Convert degrees to radians, compute sin and cos
-        float ps = glm::sin (glm::radians (phi_deg));
-        float pc = glm::cos (glm::radians (phi_deg));
-        glm::mat4 ry = glm::mat4(
-                                  pc, 0.0, -ps, 0.0, // 1st column
-                                 0.0, 1.0, 0.0, 0.0, // 2nd column
-                                  ps, 0.0,  pc, 0.0, // 3rd column
-                                 0.0, 0.0, 0.0, 1.0
-                                 );
-        //// Convert degrees to radians, compute sin and cos
-        float ts = glm::sin (glm::radians (theta_deg));
-        float tc = glm::cos (glm::radians (theta_deg));
-        glm::mat4 rx = glm::mat4(
-                                 1.0, 0.0, 0.0, 0.0, // 1st column
-                                 0.0,  tc, ts,  0.0, // 2nd column
-                                 0.0, -ts, tc,  0.0, // 3rd column
-                                 0.0, 0.0, 0.0, 1.0
-                                 );
+        // fd controls zoom (lens), world_radius controls how much of the
+        // world is framed at a given zoom level — the two are independent.
+        float lens = fd / world_radius;
+
+        // tieni il trackball sincronizzato con la finestra e con il FOV
+        // attuale, così la rotazione "sente" sempre coerente con lo zoom.
+        trackball.set_window_size ((int) aspect.width, (int) aspect.height);
+        trackball.set_view (od, 1.0f / lens);
+
+        glm::mat4 r = trackball.rotation_matrix ();
 
         // prepare translation matrix
         glm::mat4 t = glm::mat4(
@@ -183,10 +183,6 @@ private:
         float a = (fcp + ncp) / (ncp - fcp);       // coefficient 3rd col
         float b = 2.0 * fcp * ncp / (ncp - fcp);   // coefficient 4th col
 
-        // fd controls zoom (lens), world_radius controls how much of the
-        // world is framed at a given zoom level — the two are independent.
-        float lens = fd / world_radius;
-
         pr = glm::mat4(
                         lens * ratio,  0.0, 0.0,  0.0,    // 1st column
                         0.0,  lens, 0.0,  0.0,    // 2nd column
@@ -195,7 +191,7 @@ private:
                         );
 
         // Compute VP matrix and update it
-        glm::mat4 v = t * rx * ry; 
+        glm::mat4 v = t * r;
         vp = pr * v;
         glUniformMatrix4fv (vp_loc, 1, GL_FALSE, &vp[0][0]);
 

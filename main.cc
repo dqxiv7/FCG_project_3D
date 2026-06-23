@@ -63,9 +63,12 @@ class Scene
 private:
     
     std::vector<std::unique_ptr<Object>> objects;
-    GLuint FBO;
+    std::vector<Light*> lights;
+
+    GLuint PFBO;
     GLuint pickingTexture;
     GLuint RBO;
+
     GLuint obj_id = 1;
 
 public:
@@ -87,7 +90,12 @@ public:
 
     void add_light(Shaders& shaders)
     {
-        objects.push_back(std::make_unique<Light>(shaders, obj_id++));
+        auto light = std::make_unique<Light>(shaders, obj_id++, (int)lights.size());
+        lights.push_back(light.get());
+        objects.push_back(std::move(light));
+
+        GLint num_lights_loc = glGetUniformLocation(shaders.program, "num_lights");
+        glUniform1i(num_lights_loc, (GLint)lights.size());
     }
 
     const std::vector<std::unique_ptr<Object>>& get_objects() const {
@@ -98,7 +106,7 @@ public:
     {
         sf::Vector2u size = window.getSize();
 
-        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, PFBO);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f); 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -108,11 +116,12 @@ public:
 
         GLint id_loc = glGetUniformLocation(shader.program, "object_id");
         GLint model_loc = glGetUniformLocation(shader.program, "m");
+        GLint normal_matrix_loc = glGetUniformLocation(shader.program, "normal_matrix");
 
         for (const auto& obj : objects) {
             // Inviamo l'ID univoco di questa specifica mesh allo shader
             glUniform1ui(id_loc, obj->id);
-            obj->draw_obj(model_loc);
+            obj->draw_obj(model_loc, normal_matrix_loc);
         }
 
         unsigned int pickedID = 0;
@@ -127,13 +136,15 @@ public:
 
     void draw(Shaders& shader){
 
-        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
+        glClearColor (0.2f, 0.2f, 0.2f, 1.0f);
+        glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         GLint model_loc = glGetUniformLocation(shader.program, "m");
+        GLint normal_matrix_loc = glGetUniformLocation(shader.program, "normal_matrix");
 
         for (const auto& obj : objects)
         {
-            obj->draw_obj(model_loc);
+            obj->draw_obj(model_loc, normal_matrix_loc);
         }
     }
 
@@ -149,8 +160,8 @@ public:
 private:
     void initPickingBuffer(int width, int height)
     {
-        glGenFramebuffers(1, &FBO);
-        glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+        glGenFramebuffers(1, &PFBO);
+        glBindFramebuffer(GL_FRAMEBUFFER, PFBO);
 
         glGenTextures(1, &pickingTexture);
         glBindTexture(GL_TEXTURE_2D, pickingTexture);
@@ -172,16 +183,10 @@ private:
 ////////////////////
 // SFML Callbacks //
 ////////////////////
-
-void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera, Object& object, Scene& scene)
+void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera)
 {
-
     switch (key.scancode) {
-    case sf::Keyboard::Scancode::Space:
-        shaders.reload ("00_vertex.vert", "00_fragment.frag");
-        shaders.use ();
-        return;
-    case sf::Keyboard::Scancode::N:
+     case sf::Keyboard::Scancode::N:
         camera.view_normal ();
         return;
     case sf::Keyboard::Scancode::T:
@@ -190,6 +195,16 @@ void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera,
     case sf::Keyboard::Scancode::W:
         camera.view_wide ();
         return;
+    default:
+        return;
+    }
+}
+
+
+void handle (const sf::Event::KeyPressed& key, Object& object, Scene& scene)
+{
+
+    switch (key.scancode) {
     case sf::Keyboard::Scancode::G:
         if (!object.moving){
             object.moving = true;
@@ -205,9 +220,10 @@ void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera,
             object.moving = true;
             object.mode = Object::TransformMode::Rotate;
         }
-        else{ 
+        else{
             object.moving = false;
-            object.mode = Object::TransformMode::None;            
+            object.mode = Object::TransformMode::None;
+            object.trackball_active = false;
         }
         return;
     case sf::Keyboard::Scancode::S:
@@ -224,33 +240,33 @@ void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera,
     }
 }
 
-void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object& object)
+void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object* object)
 {
     float x = mouse->position.x;
     float y = mouse->position.y;
     static float prev_x = 0;
     static float prev_y = 0;
 
-    float dx = x - prev_x; 
-    float dy = y - prev_y; 
+    float dx = x - prev_x;
+    float dy = y - prev_y;
     // std::cout <<"dx: "<<dx<<" | dy: "<<dy<<"\n";
     prev_x = x;
     prev_y = y;
 
-    if (object.moving){
-        if (object.mode == Object::TransformMode::Translate)
-            object.translation(dx,-dy,camera.inv_v, camera.od, camera.fd);
-        else if (object.mode == Object::TransformMode::Rotate)
-            object.rotation(dx, dy, camera.inv_v, camera.od, camera.fd);
-        else if (object.mode == Object::TransformMode::Scale)
-            object.scale(dx,dy, camera.od, camera.fd);
+    if (object && object->moving){
+        if (object->mode == Object::TransformMode::Translate)
+            object->translation(dx,-dy,camera.inv_v, camera.od, camera.fd);
+        else if (object->mode == Object::TransformMode::Rotate)
+            object->rotation(x, y, camera.inv_v, camera.aspect.width, camera.aspect.height);
+        else if (object->mode == Object::TransformMode::Scale)
+            object->scale(dx,dy, camera.od, camera.fd);
     }
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)){
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
             camera.pan(dx,dy);
     }
     else if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
-        camera.drag (dx, dy);
+        camera.drag (x, y);
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LAlt))
         camera.zoom(dy);
 }
@@ -278,7 +294,14 @@ void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& 
                     scene.active = obj.get();
             }
         }
+        else if (id == 0) scene.active = nullptr;
     }
+}
+
+void handle (const sf::Event::MouseButtonReleased* mouse, Camera& camera)
+{
+    if (mouse->button == sf::Mouse::Button::Middle)
+        camera.drag_stop ();
 }
 
 void handle (const sf::Event::Resized* resized, Camera& camera, Scene& scene)
@@ -304,50 +327,76 @@ int main (int argc, char* argv[])
     Setup setup;
     sf::Window& window = *setup.window;
 
+    Gui gui (window, 800, 800);
+
     Shaders shaders ("vertex.vert", "fragment.frag");
 
     shaders.use ();
 
-
     Shaders picking ("vertex.vert", "picking.frag");
-
 
     Camera camera (shaders);
 
     // the cube is always the first object loaded into the scene
     Scene scene ("data/cube.off", shaders);
+    scene.add_light(shaders);
 
     for (const auto& meshfile : meshfiles)
         scene.add_obj (meshfile, shaders);
+
+    Grid grid (shaders);
+    Axes axes (shaders);
 
     glEnable (GL_CULL_FACE);
     glCullFace (GL_BACK);
 
     glEnable (GL_DEPTH_TEST);
+    glDepthFunc (GL_LEQUAL);
 
+    glEnable (GL_BLEND);
+    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //// Main Loop ////
 
+    sf::Clock clock;
     bool running = true;
     while (running)
     {
         while (const std::optional event = window.pollEvent ())
         {
+            gui.process_event (window, *event);
+
             if (event->is<sf::Event::Closed> ())
                 running = false;
             else if (const auto* resized = event->getIf<sf::Event::Resized> ())
                 handle (resized, camera, scene);
             else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
-                handle (*key_pressed, shaders, camera, *scene.active, scene);
+            {
+                if (scene.active)
+                    handle (*key_pressed, *scene.active, scene);
+                handle(*key_pressed, shaders, camera);
+            }
             else if (const auto* mouse = event->getIf<sf::Event::MouseMoved> ())
-                handle (mouse, camera, *scene.active);
+                handle (mouse, camera, scene.active);
             else if (const auto* wheel = event->getIf<sf::Event::MouseWheelScrolled> ())
                 handle (wheel, camera);
             else if (const auto* mouse = event->getIf<sf::Event::MouseButtonPressed>())
                 handle(mouse, scene, picking, shaders, window, camera);
+            else if (const auto* mouse = event->getIf<sf::Event::MouseButtonReleased>())
+                handle(mouse, camera);
         }
 
+        sf::Time elapsed = clock.restart ();
+        gui.new_frame (window, elapsed);
+
+        ImGui::Begin ("Debug");
+        ImGui::Text ("ImGui attivo");
+        ImGui::End ();
+
         scene.draw (shaders);
+        grid.draw ();
+        axes.draw ();
+        gui.render ();
         window.display ();
     }
 

@@ -5,6 +5,7 @@ layout(location = 1) in vec3 normal;
 
 uniform mat4 vp;
 uniform mat4 m;
+uniform mat3 normal_matrix;
 
 out vec3 interpolated_pos;
 out vec3 interpolated_normal;
@@ -17,5 +18,5 @@ void main()
 
     interpolated_pos = vec3(world_pos);
 
-    interpolated_normal = normal;
+    interpolated_normal = normal_matrix * normal;
 }
