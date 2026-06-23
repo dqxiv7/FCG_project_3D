@@ -66,6 +66,7 @@ class Object{
     }
 
     GLuint id;
+    std::string name;
 
     bool moving = false;
 

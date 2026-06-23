@@ -23,7 +23,6 @@
 
 #include <cstdlib>
 
-#include "include/imgui.hh"
 #include "include/hotshaders.hh"
 #include "include/grid.hh"
 #include "include/trackball.hh"
@@ -31,5 +30,7 @@
 #include "include/camera.hh"
 #include "include/mesh.hh"
 #include "include/light.hh"
+#include "include/scene.hh"
+#include "include/imgui.hh"
 
 #endif

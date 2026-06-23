@@ -77,6 +77,13 @@ namespace fcg
             moving = false;
         }
 
+        void set_rotation (const glm::quat& rotation)
+        {
+            current_rotation = rotation;
+            drag_rotation = glm::quat (1.0f, 0.0f, 0.0f, 0.0f);
+            moving = false;
+        }
+
         void start (float x, float y)
         {
             last_point = project_on_trackball (x, y);

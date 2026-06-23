@@ -17,6 +17,8 @@ private:
     fcg::Trackball trackball;
     bool dragging = false;
 
+    bool ortographic = false;
+
     const float normal_fd = 6.0;
     const float tele_fd = 100.0;
     const float wide_fd = 1.5;
@@ -73,6 +75,7 @@ public:
 
     void drag (float x, float y)
     {
+        ortographic = false;
         if (!dragging) {
             trackball.start (x, y);
             dragging = true;
@@ -149,6 +152,30 @@ public:
         update();
     }
 
+    void view_front()
+    {
+        glm::mat4 look_at = glm::lookAt(glm::vec3(0,0,1), glm::vec3(0,0,0), glm::vec3(0,1,0));
+        trackball.set_rotation(glm::toQuat(glm::mat3(look_at)));
+        ortographic = true;
+        update();
+    }
+
+    void view_top()
+    {
+        glm::mat4 look_at = glm::lookAt(glm::vec3(0,1,0), glm::vec3(0,0,0), glm::vec3(0,0,-1));
+        trackball.set_rotation(glm::toQuat(glm::mat3(look_at)));
+        ortographic = true;
+        update();
+    }
+    
+    void view_right()
+    {
+        glm::mat4 look_at = glm::lookAt(glm::vec3(1,0,0), glm::vec3(0,0,0), glm::vec3(0,1,0));
+        trackball.set_rotation(glm::toQuat(glm::mat3(look_at)));
+        ortographic = true;
+        update();
+    }
+
 private:
 
     void update ()
@@ -179,16 +206,34 @@ private:
                                  pan_x, pan_y, -od, 1.0  // translate object along the Z axis
                                  );
 
-        // prepare projection matrix
-        float a = (fcp + ncp) / (ncp - fcp);       // coefficient 3rd col
-        float b = 2.0 * fcp * ncp / (ncp - fcp);   // coefficient 4th col
+        if (ortographic){
+            float half_height = od / lens;
+            float half_width  = half_height / ratio;
+            float coeff_x = 1.0 / half_width;
+            float coeff_y = 1.0 / half_height;
 
-        pr = glm::mat4(
-                        lens * ratio,  0.0, 0.0,  0.0,    // 1st column
-                        0.0,  lens, 0.0,  0.0,    // 2nd column
-                        0.0, 0.0,   a, -1.0,    // 3rd column
-                        0.0, 0.0,   b,  0.0     // 4th column
-                        );
+            float a_ortho = -2.0 / (fcp - ncp);
+            float b_ortho = -(fcp + ncp) / (fcp - ncp);
+
+            pr = glm::mat4(
+            coeff_x, 0.0, 0.0,     0.0,
+            0.0, coeff_y, 0.0,     0.0,
+            0.0, 0.0,    a_ortho,  0.0,   // qui 0, non -1
+            0.0, 0.0,    b_ortho,  1.0    // qui 1, non 0
+            );
+        }
+        else{
+            // prepare projection matrix
+            float a = (fcp + ncp) / (ncp - fcp);       // coefficient 3rd col
+            float b = 2.0 * fcp * ncp / (ncp - fcp);   // coefficient 4th col
+
+            pr = glm::mat4(
+                            lens * ratio,  0.0, 0.0,  0.0,    // 1st column
+                            0.0,  lens, 0.0,  0.0,    // 2nd column
+                            0.0, 0.0,   a, -1.0,    // 3rd column
+                            0.0, 0.0,   b,  0.0     // 4th column
+                            );
+        }
 
         // Compute VP matrix and update it
         glm::mat4 v = t * r;

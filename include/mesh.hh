@@ -8,6 +8,7 @@ public:
     Mesh(const std::string& filename, Shaders& shaders, GLuint pick_id) {
 
         id = pick_id;
+        name = std::filesystem::path(filename).stem().string();
         
         std::ifstream file (filename);
  

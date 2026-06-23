@@ -1,6 +1,8 @@
 class Light : public Mesh
 {
   public:
+    glm::vec3 light_color = {1.0f, 1.0f, 1.0f};
+    float light_intensity = 1.0f;
     glm::vec3 light_direct_val = {1.0, 1.0, 1.0};   // rgb
     glm::vec3 light_ambient_val = {0.1, 0.1, 0.1};  // rgb
 
@@ -20,14 +22,22 @@ class Light : public Mesh
     Light (Shaders& shaders, GLuint pick_id, int index)
       : Mesh ("data/sphere.off", shaders, pick_id)
     {
+        name = "Light " + std::to_string(index + 1);
+
         scale_factor *= 0.05f;
 
         float angle = glm::radians (90.0f * index);
         position = {0.8f * cos (angle), 0.6f, 0.8f * sin (angle)};
 
         locations (shaders, index);
-        parameters();
+        update_color();
         compute_mm();
+    }
+
+    void update_color()
+    {
+        light_direct_val = light_color * light_intensity;
+        parameters();
     }
 
     void locations (Shaders& shaders, int index)
