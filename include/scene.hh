@@ -58,7 +58,7 @@ public:
         }
         active = obj;
     }
-    
+     
     void remove_active(Shaders& shaders)
     {
         if (!active)
