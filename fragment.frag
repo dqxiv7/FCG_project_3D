@@ -10,10 +10,11 @@ uniform vec3 camera_pos;
 struct Light {
     vec3 direct_pos;
     vec3 direct_val;
-    vec3 ambient_val;
 };
 uniform Light lights[MAX_LIGHTS];
 uniform int num_lights;
+
+uniform vec3 ambient_light;
 
 struct Material {
     vec3 ambient;
@@ -38,12 +39,10 @@ void main()
     vec3 normal = normalize (interpolated_normal);
     vec3 view_dir = normalize (camera_pos - interpolated_pos);
 
-    vec3 result = vec3(0.0);
+    // Ambient: un solo termine globale, non si somma per ogni luce.
+    vec3 result = material.ambient * ambient_light;
 
     for (int i = 0; i < num_lights; i++) {
-        // Ambient
-        vec3 ambient = material.ambient * lights[i].ambient_val;
-
         // Diffuse
         vec3 light_dir = normalize (lights[i].direct_pos - interpolated_pos);
         float diff = max (dot (normal, light_dir), 0.0);
@@ -54,7 +53,7 @@ void main()
         float spec = pow (max (dot (view_dir, reflect_dir), 0.0), material.shininess);
         vec3 specular = material.specular * spec * lights[i].direct_val;
 
-        result += ambient + diffuse + specular;
+        result += diffuse + specular;
     }
 
     fragment_color = vec4(result, 1.0);

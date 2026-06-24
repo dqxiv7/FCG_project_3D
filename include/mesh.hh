@@ -4,7 +4,18 @@ private:
     std::vector<glm::vec3> normals;
     std::vector<glm::uvec3> triangles;
 
+    GLint material_diffuse_loc;   // rgb
+    GLint material_ambient_loc;   // rgb
+    GLint material_specular_loc;  // rgb
+    GLint material_shininess_loc; // scalar
+
 public:
+
+    glm::vec3 material_diffuse = {0.8, 0.7, 0.6};   // rgb
+    glm::vec3 material_ambient = {0.5, 0.5, 0.8};   // rgb
+    glm::vec3 material_specular = {1.0, 1.0, 1.0};  // rgb
+    float material_shininess = 3.0; // scalar
+
     Mesh(const std::string& filename, Shaders& shaders, GLuint pick_id) {
 
         id = pick_id;
@@ -90,8 +101,29 @@ public:
         compute_normals ();
         compute_mm();
 
+        material_diffuse_loc = glGetUniformLocation (shaders.program, "material.diffuse");
+        material_ambient_loc = glGetUniformLocation (shaders.program, "material.ambient");
+        material_specular_loc = glGetUniformLocation (shaders.program, "material.specular");
+        material_shininess_loc = glGetUniformLocation (shaders.program, "material.shininess");
+
+        update_materials();
+
         pack4gpu();
         send_arrays_2a3f();
+    }
+
+    void update_materials()
+    {
+        glUniform3fv (material_diffuse_loc, 1, &material_diffuse[0]);
+        glUniform3fv (material_ambient_loc, 1, &material_ambient[0]);
+        glUniform3fv (material_specular_loc, 1, &material_specular[0]);
+        glUniform1fv (material_shininess_loc, 1, &material_shininess);
+    }
+
+    void draw_obj(GLint model_loc, GLint normal_matrix_loc) override
+    {
+        update_materials();
+        Object::draw_obj(model_loc, normal_matrix_loc);
     }
 
 private:

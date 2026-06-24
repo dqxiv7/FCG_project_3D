@@ -4,13 +4,11 @@ class Light : public Mesh
     glm::vec3 light_color = {1.0f, 1.0f, 1.0f};
     float light_intensity = 1.0f;
     glm::vec3 light_direct_val = {1.0, 1.0, 1.0};   // rgb
-    glm::vec3 light_ambient_val = {0.1, 0.1, 0.1};  // rgb
 
   private:
     // lights and materials
     GLint light_direct_pos_loc;   // xyz
     GLint light_direct_val_loc;   // rgb
-    GLint light_ambient_val_loc;  // rgb
     GLint unlit_loc;
     GLint unlit_color_loc;
     GLint unlit_alpha_loc;
@@ -27,7 +25,7 @@ class Light : public Mesh
         scale_factor *= 0.05f;
 
         float angle = glm::radians (90.0f * index);
-        position = {0.8f * cos (angle), 0.6f, 0.8f * sin (angle)};
+        position = {3.0f * cos (angle), 2.5f, 3.0f * sin (angle)};
 
         locations (shaders, index);
         update_color();
@@ -45,7 +43,6 @@ class Light : public Mesh
         std::string prefix = "lights[" + std::to_string (index) + "].";
         light_direct_pos_loc = glGetUniformLocation (shaders.program, (prefix + "direct_pos").c_str());
         light_direct_val_loc = glGetUniformLocation (shaders.program, (prefix + "direct_val").c_str());
-        light_ambient_val_loc = glGetUniformLocation (shaders.program, (prefix + "ambient_val").c_str());
         unlit_loc = glGetUniformLocation (shaders.program, "unlit");
         unlit_color_loc = glGetUniformLocation (shaders.program, "unlit_color");
         unlit_alpha_loc = glGetUniformLocation (shaders.program, "unlit_alpha");
@@ -55,7 +52,6 @@ class Light : public Mesh
     void parameters ()
     {
         glUniform3fv (light_direct_val_loc, 1, &light_direct_val[0]);
-        glUniform3fv (light_ambient_val_loc, 1, &light_ambient_val[0]);
     }
 
     void compute_mm () override

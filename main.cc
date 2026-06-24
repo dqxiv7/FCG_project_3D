@@ -61,7 +61,7 @@ public:
 ////////////////////
 // SFML Callbacks //
 ////////////////////
-void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera)
+void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera, bool& open_add_menu)
 {
     switch (key.scancode) {
      case sf::Keyboard::Scancode::N:
@@ -73,16 +73,23 @@ void handle (const sf::Event::KeyPressed& key, Shaders& shaders, Camera& camera)
     case sf::Keyboard::Scancode::W:
         camera.view_wide ();
         return;
+    case sf::Keyboard::Scancode::A:
+        if (sf::Keyboard::isKeyPressed (sf::Keyboard::Key::LShift) || sf::Keyboard::isKeyPressed (sf::Keyboard::Key::RShift))
+            open_add_menu = true;
+        return;
     default:
         return;
     }
 }
 
 
-void handle (const sf::Event::KeyPressed& key, Object& object, Scene& scene)
+void handle (const sf::Event::KeyPressed& key, Object& object, Scene& scene, bool& open_delete_confirm)
 {
 
     switch (key.scancode) {
+    case sf::Keyboard::Scancode::X:
+        open_delete_confirm = true;
+        return;
     case sf::Keyboard::Scancode::G:
         if (!object.moving){
             object.moving = true;
@@ -139,6 +146,9 @@ void handle (const sf::Event::MouseMoved* mouse, Camera& camera, Object* object)
         else if (object->mode == Object::TransformMode::Scale)
             object->scale(dx,dy, camera.od, camera.fd);
     }
+    else if (ImGui::GetIO ().WantCaptureMouse) {
+        // il mouse sta interagendo con un pannello: non muovere la camera
+    }
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)){
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle))
             camera.pan(dx,dy);
@@ -156,6 +166,9 @@ void handle (const sf::Event::MouseWheelScrolled* wheel, Camera& camera)
 
 void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& picking, Shaders& shaders, sf::Window& window, Camera& camera)
 {
+    if (ImGui::GetIO ().WantCaptureMouse)
+        return;
+
     if (mouse->button == sf::Mouse::Button::Left){
         sf::Vector2i pixel_tmp = sf::Mouse::getPosition(window);
         glm::vec2 pixel_pos = glm::vec2(pixel_tmp.x, pixel_tmp.y);
@@ -169,10 +182,10 @@ void handle (const sf::Event::MouseButtonPressed* mouse, Scene& scene, Shaders& 
             const auto& objs = scene.get_objects();
             for (const auto& obj : objs){
                 if (obj->id == id)
-                    scene.active = obj.get();
+                    scene.set_active(obj.get());
             }
         }
-        else if (id == 0) scene.active = nullptr;
+        else if (id == 0) scene.set_active(nullptr);
     }
 }
 
@@ -238,8 +251,13 @@ int main (int argc, char* argv[])
 
     sf::Clock clock;
     bool running = true;
+    bool open_add_menu = false;
+    bool open_delete_confirm = false;
     while (running)
     {
+        sf::Time elapsed = clock.restart ();
+        gui.new_frame (window, elapsed);
+
         while (const std::optional event = window.pollEvent ())
         {
             gui.process_event (window, *event);
@@ -251,8 +269,8 @@ int main (int argc, char* argv[])
             else if (const auto* key_pressed = event->getIf<sf::Event::KeyPressed> ())
             {
                 if (scene.active)
-                    handle (*key_pressed, *scene.active, scene);
-                handle(*key_pressed, shaders, camera);
+                    handle (*key_pressed, *scene.active, scene, open_delete_confirm);
+                handle(*key_pressed, shaders, camera, open_add_menu);
             }
             else if (const auto* mouse = event->getIf<sf::Event::MouseMoved> ())
                 handle (mouse, camera, scene.active);
@@ -264,13 +282,10 @@ int main (int argc, char* argv[])
                 handle(mouse, camera);
         }
 
-        sf::Time elapsed = clock.restart ();
-        gui.new_frame (window, elapsed);
-
         float window_width = (float) window.getSize().x;
         draw_view_panel (camera);
-        draw_outliner (scene, window_width);
-        draw_light_panel (scene, window_width);
+        draw_outliner (scene, shaders, window_width, open_add_menu, open_delete_confirm);
+        draw_properties_panel (scene, camera, window_width);
 
         scene.draw (shaders);
         grid.draw ();

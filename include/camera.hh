@@ -33,19 +33,11 @@ private:
     GLint camera_pos_loc;  // xyz
     glm::vec3 camera_pos = {0.0, 0.0, 0.0};   // xyz
 
-    //materials
-    GLint material_diffuse_loc;   // rgb
-    GLint material_ambient_loc;   // rgb
-    GLint material_specular_loc;  // rgb
-    GLint material_shininess_loc; // scalar
+    GLint ambient_light_loc;
 
-    glm::vec3 material_diffuse = {0.8, 0.7, 0.6};   // rgb
-    glm::vec3 material_ambient = {0.5, 0.5, 0.8};   // rgb
-    glm::vec3 material_specular = {1.0, 1.0, 1.0};  // rgb
-    float material_shininess = 3.0; // scalar
-
-    
 public:
+
+    glm::vec3 ambient_light = {0.1f, 0.1f, 0.1f};
 
     glm::mat4 inv_v;
     glm::mat4 pr;
@@ -60,17 +52,15 @@ public:
         vp_loc = glGetUniformLocation (shaders.program, "vp");
         camera_pos_loc = glGetUniformLocation (shaders.program, "camera_pos");
 
-        material_diffuse_loc = glGetUniformLocation (shaders.program, "material.diffuse");
-        material_ambient_loc = glGetUniformLocation (shaders.program, "material.ambient");
-        material_specular_loc = glGetUniformLocation (shaders.program, "material.specular");
-        material_shininess_loc = glGetUniformLocation (shaders.program, "material.shininess");
-
-        glUniform3fv (material_diffuse_loc, 1, &material_diffuse[0]);
-        glUniform3fv (material_ambient_loc, 1, &material_ambient[0]);
-        glUniform3fv (material_specular_loc, 1, &material_specular[0]);
-        glUniform1fv (material_shininess_loc, 1, &material_shininess);
+        ambient_light_loc = glGetUniformLocation (shaders.program, "ambient_light");
+        update_ambient ();
 
         view_normal ();
+    }
+
+    void update_ambient ()
+    {
+        glUniform3fv (ambient_light_loc, 1, &ambient_light[0]);
     }
 
     void drag (float x, float y)

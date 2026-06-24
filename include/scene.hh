@@ -13,6 +13,10 @@ private:
 
 public:
 
+    // deve combaciare con #define MAX_LIGHTS in fragment.frag — l'array
+    // di luci nello shader ha questa dimensione fissa.
+    static constexpr size_t MAX_LIGHTS = 4;
+
     Object* active = nullptr;
 
     Scene (std::string filename, Shaders& shaders)
@@ -30,6 +34,9 @@ public:
 
     void add_light(Shaders& shaders)
     {
+        if (lights.size() >= MAX_LIGHTS)
+            return;
+
         auto light = std::make_unique<Light>(shaders, obj_id++, (int)lights.size());
         lights.push_back(light.get());
         objects.push_back(std::move(light));
@@ -40,6 +47,49 @@ public:
 
     const std::vector<std::unique_ptr<Object>>& get_objects() const {
         return objects;
+    }
+
+    void set_active(Object* obj)
+    {
+        if (active) {
+            active->moving = false;
+            active->mode = Object::TransformMode::None;
+            active->trackball_active = false;
+        }
+        active = obj;
+    }
+    
+    void remove_active(Shaders& shaders)
+    {
+        if (!active)
+            return;
+
+        Light* light = dynamic_cast<Light*>(active);
+        if (light) {
+            for (size_t i = 0; i < lights.size(); i++) {
+                if (lights[i] == light) {
+                    lights.erase(lights.begin() + i);
+                    break;
+                }
+            }
+            for (size_t i = 0; i < lights.size(); i++) {
+                lights[i]->locations(shaders, (int)i);
+                lights[i]->update_color();
+                lights[i]->compute_mm();
+            }
+
+            GLint num_lights_loc = glGetUniformLocation(shaders.program, "num_lights");
+            glUniform1i(num_lights_loc, (GLint)lights.size());
+        }
+
+        for (size_t i = 0; i < objects.size(); i++) {
+            if (objects[i].get() == active) {
+                objects.erase(objects.begin() + i);
+                break;
+            }
+        }
+
+        active = nullptr;
     }
 
     const std::vector<Light*>& get_lights() const {
